@@ -31,7 +31,9 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 
 from resnet import resnet18, resnet34
+import warnings
 
+warnings.filterwarnings("ignore", message="Truncated File Read")
 FOOD101_MEAN = (0.557, 0.442, 0.327)
 FOOD101_STD = (0.259, 0.263, 0.265)
 
@@ -57,9 +59,9 @@ def parse_args() -> argparse.Namespace:
     )
     # 模型和优化参数。
     parser.add_argument("--model", choices=["resnet18", "resnet34"], default="resnet18")
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument(
