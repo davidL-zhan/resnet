@@ -55,19 +55,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--image-size", type=int, default=224, help="输入图片裁剪后的边长"
     )
-    parser.add_argument(
-        "--subset-train",
-        type=int,
-        default=None,
-        help="只取前 N 条训练样本，主要用于快速调试；完整训练不要传。",
-    )
-    parser.add_argument(
-        "--subset-val",
-        type=int,
-        default=None,
-        help="只取前 N 条验证样本，主要用于快速调试；完整训练不要传。",
-    )
-
     # 模型和优化参数。
     parser.add_argument("--model", choices=["resnet18", "resnet34"], default="resnet18")
     parser.add_argument("--epochs", type=int, default=30)
@@ -188,14 +175,6 @@ def load_food101(args: argparse.Namespace):
     class_names = raw_dataset["train"].features["label"].names
     train_dataset = raw_dataset["train"]
     val_dataset = raw_dataset["validation"]
-
-    # 小样本模式只用于确认训练流程能跑通；正式训练应使用完整 split。
-    if args.subset_train is not None:
-        train_dataset = train_dataset.select(
-            range(min(args.subset_train, len(train_dataset)))
-        )
-    if args.subset_val is not None:
-        val_dataset = val_dataset.select(range(min(args.subset_val, len(val_dataset))))
 
     train_transform, eval_transform = build_transforms(args.image_size)
 
