@@ -10,26 +10,19 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="检查 ethz/food101 数据集加载状态")
-    parser.add_argument(
-        "--cache-dir",
-        type=Path,
-        default=None,
-        help="可选数据集缓存目录；不传则使用 Hugging Face 默认缓存位置。",
-    )
     return parser.parse_args()
 
 
 def main() -> None:
-    args = parse_args()
+    parse_args()
 
     from datasets import load_dataset
 
-    dataset = load_dataset("ethz/food101", cache_dir=str(args.cache_dir) if args.cache_dir else None)
+    dataset = load_dataset("ethz/food101")
 
     print(dataset)
 
@@ -42,6 +35,7 @@ def main() -> None:
     print(f"第一张图片尺寸: {first_sample['image'].size}")
     print(f"第一条标签 id: {first_sample['label']}")
     print(f"第一条标签名: {class_names[first_sample['label']]}")
+    first_sample["image"].show()
 
 
 if __name__ == "__main__":

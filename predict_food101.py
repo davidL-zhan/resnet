@@ -22,12 +22,16 @@ from PIL import Image
 from torchvision import transforms
 
 from resnet import resnet18, resnet34
-from train_food101 import IMAGENET_MEAN, IMAGENET_STD
+from train_food101 import IMAGENET_MEAN, IMAGENET_STD, FOOD101_MEAN, FOOD101_STD
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Predict Food101 class with a trained ResNet")
-    parser.add_argument("--checkpoint", type=Path, required=True, help="训练得到的 best.pt 或 last.pt")
+    parser = argparse.ArgumentParser(
+        description="Predict Food101 class with a trained ResNet"
+    )
+    parser.add_argument(
+        "--checkpoint", type=Path, required=True, help="训练得到的 best.pt 或 last.pt"
+    )
     parser.add_argument("--image", type=Path, required=True, help="待分类图片路径")
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--topk", type=int, default=5)
@@ -48,7 +52,7 @@ def build_eval_transform(image_size: int) -> transforms.Compose:
             transforms.Resize(image_size + 32),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
-            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            transforms.Normalize(FOOD101_MEAN, FOOD101_STD),
         ]
     )
 
@@ -87,7 +91,9 @@ def main() -> None:
     scores, indices = torch.topk(probabilities, k=topk)
 
     print(f"图片: {args.image}")
-    for rank, (score, index) in enumerate(zip(scores.tolist(), indices.tolist()), start=1):
+    for rank, (score, index) in enumerate(
+        zip(scores.tolist(), indices.tolist()), start=1
+    ):
         print(f"top{rank}: {class_names[index]}  prob={score:.4f}")
 
 

@@ -30,6 +30,9 @@ from torchvision import transforms
 
 from resnet import resnet18, resnet34
 
+FOOD101_MEAN = (0.557, 0.442, 0.327)
+FOOD101_STD = (0.259, 0.263, 0.265)
+
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -47,8 +50,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train ResNet on ethz/food101")
 
     # 数据相关参数。
-    parser.add_argument("--cache-dir", type=Path, default=None, help="Hugging Face 数据集缓存目录")
-    parser.add_argument("--image-size", type=int, default=224, help="输入图片裁剪后的边长")
+    parser.add_argument(
+        "--image-size", type=int, default=224, help="输入图片裁剪后的边长"
+    )
     parser.add_argument(
         "--subset-train",
         type=int,
@@ -67,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=0.1)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument(
@@ -84,9 +88,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
 
     # 输出与恢复训练。
-    parser.add_argument("--output-dir", type=Path, default=Path("checkpoints/food101_resnet18"))
-    parser.add_argument("--resume", type=Path, default=None, help="从某个 checkpoint 继续训练")
-    parser.add_argument("--print-freq", type=int, default=50, help="每多少个 step 打印一次训练状态")
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("checkpoints/food101_resnet18")
+    )
+    parser.add_argument(
+        "--resume", type=Path, default=None, help="从某个 checkpoint 继续训练"
+    )
+    parser.add_argument(
+        "--print-freq", type=int, default=50, help="每多少个 step 打印一次训练状态"
+    )
     parser.add_argument(
         "--download-only",
         action="store_true",
@@ -122,7 +132,7 @@ def build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Co
             transforms.RandomResizedCrop(image_size, scale=(0.6, 1.0)),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.ToTensor(),
-            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            transforms.Normalize(FOOD101_MEAN, FOOD101_STD),
         ]
     )
 
@@ -131,7 +141,7 @@ def build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Co
             transforms.Resize(image_size + 32),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
-            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+            transforms.Normalize(FOOD101_MEAN, FOOD101_STD),
         ]
     )
 
@@ -150,10 +160,7 @@ def load_food101(args: argparse.Namespace):
     # datasets 放在函数里导入，让脚本启动时不必立刻加载该依赖。
     from datasets import load_dataset
 
-    raw_dataset = load_dataset(
-        "ethz/food101",
-        cache_dir=str(args.cache_dir) if args.cache_dir else None,
-    )
+    raw_dataset = load_dataset("ethz/food101")
 
     class_names = raw_dataset["train"].features["label"].names
     train_dataset = raw_dataset["train"]
@@ -161,7 +168,9 @@ def load_food101(args: argparse.Namespace):
 
     # 小样本模式只用于确认训练流程能跑通；正式训练应使用完整 split。
     if args.subset_train is not None:
-        train_dataset = train_dataset.select(range(min(args.subset_train, len(train_dataset))))
+        train_dataset = train_dataset.select(
+            range(min(args.subset_train, len(train_dataset)))
+        )
     if args.subset_val is not None:
         val_dataset = val_dataset.select(range(min(args.subset_val, len(val_dataset))))
 
@@ -170,11 +179,15 @@ def load_food101(args: argparse.Namespace):
     def apply_train_transform(batch: dict[str, Any]) -> dict[str, Any]:
         # Hugging Face Dataset 的 with_transform 会把样本按 batch 形式传进来，
         # 因此这里要对 batch["image"] 中的每张 PIL 图片逐一做 transform。
-        batch["pixel_values"] = [train_transform(ensure_rgb(image)) for image in batch["image"]]
+        batch["pixel_values"] = [
+            train_transform(ensure_rgb(image)) for image in batch["image"]
+        ]
         return batch
 
     def apply_eval_transform(batch: dict[str, Any]) -> dict[str, Any]:
-        batch["pixel_values"] = [eval_transform(ensure_rgb(image)) for image in batch["image"]]
+        batch["pixel_values"] = [
+            eval_transform(ensure_rgb(image)) for image in batch["image"]
+        ]
         return batch
 
     return (
@@ -303,7 +316,9 @@ def train_one_epoch(
                 f"train_loss={avg_loss:.4f} train_top1={avg_acc:.4f}"
             )
 
-    return EpochResult(loss=total_loss / total_samples, top1=total_correct / total_samples)
+    return EpochResult(
+        loss=total_loss / total_samples, top1=total_correct / total_samples
+    )
 
 
 @torch.no_grad()
@@ -333,7 +348,9 @@ def evaluate(
         total_correct += (logits.argmax(dim=1) == labels).sum().item()
         total_samples += batch_size
 
-    return EpochResult(loss=total_loss / total_samples, top1=total_correct / total_samples)
+    return EpochResult(
+        loss=total_loss / total_samples, top1=total_correct / total_samples
+    )
 
 
 def save_checkpoint(
@@ -351,7 +368,8 @@ def save_checkpoint(
     path.parent.mkdir(parents=True, exist_ok=True)
 
     serializable_args = {
-        key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in vars(args).items()
     }
 
     checkpoint = {
@@ -396,7 +414,9 @@ def load_checkpoint_if_needed(
     start_epoch = int(checkpoint["epoch"]) + 1
     best_top1 = float(checkpoint.get("best_top1", 0.0))
 
-    print(f"从 {resume_path} 恢复训练：start_epoch={start_epoch}, best_top1={best_top1:.4f}")
+    print(
+        f"从 {resume_path} 恢复训练：start_epoch={start_epoch}, best_top1={best_top1:.4f}"
+    )
     return start_epoch, best_top1
 
 
@@ -465,7 +485,9 @@ def main() -> None:
             epoch=epoch,
             print_freq=args.print_freq,
         )
-        val_result = evaluate(model=model, loader=val_loader, criterion=criterion, device=device)
+        val_result = evaluate(
+            model=model, loader=val_loader, criterion=criterion, device=device
+        )
         scheduler.step()
 
         is_best = val_result.top1 > best_top1
