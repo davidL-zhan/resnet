@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+
+checkpoints/
+hf_cache/
+runs/
+
+*.pt
+*.pth
+*.ckpt
