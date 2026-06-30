@@ -99,7 +99,7 @@ E:\miniconda\envs\DarkFLow\python.exe train_food101.py `
   --model resnet18 `
   --epochs 30 `
   --batch-size 64 `
-  --lr 0.1 `
+  --lr 0.0003 `
   --amp `
   --output-dir checkpoints/food101_resnet18
 ```
@@ -111,7 +111,7 @@ E:\miniconda\envs\DarkFLow\python.exe train_food101.py `
   --model resnet34 `
   --epochs 30 `
   --batch-size 64 `
-  --lr 0.1 `
+  --lr 0.0003 `
   --amp `
   --output-dir checkpoints/food101_resnet34
 ```

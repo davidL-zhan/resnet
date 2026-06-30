@@ -19,6 +19,7 @@ import argparse
 import json
 import random
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -71,9 +72,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument(
         "--amp",
         action="store_true",
@@ -148,6 +148,33 @@ def build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Co
     return train_transform, eval_transform
 
 
+def apply_train_transform(
+    batch: dict[str, Any],
+    transform: transforms.Compose,
+) -> dict[str, Any]:
+    """
+    对训练 batch 应用图片增强。
+
+    这个函数必须放在文件顶层，因为 Windows 下 DataLoader(num_workers>0)
+    使用 spawn 启动子进程，需要 pickle dataset transform。局部函数不能 pickle。
+    """
+
+    # Hugging Face Dataset 的 with_transform 会把样本按 batch 形式传进来，
+    # 因此这里要对 batch["image"] 中的每张 PIL 图片逐一做 transform。
+    batch["pixel_values"] = [transform(ensure_rgb(image)) for image in batch["image"]]
+    return batch
+
+
+def apply_eval_transform(
+    batch: dict[str, Any],
+    transform: transforms.Compose,
+) -> dict[str, Any]:
+    """对验证 batch 应用确定性预处理。"""
+
+    batch["pixel_values"] = [transform(ensure_rgb(image)) for image in batch["image"]]
+    return batch
+
+
 def load_food101(args: argparse.Namespace):
     """
     加载 Food101，并返回 train/validation split 和类别名。
@@ -176,23 +203,13 @@ def load_food101(args: argparse.Namespace):
 
     train_transform, eval_transform = build_transforms(args.image_size)
 
-    def apply_train_transform(batch: dict[str, Any]) -> dict[str, Any]:
-        # Hugging Face Dataset 的 with_transform 会把样本按 batch 形式传进来，
-        # 因此这里要对 batch["image"] 中的每张 PIL 图片逐一做 transform。
-        batch["pixel_values"] = [
-            train_transform(ensure_rgb(image)) for image in batch["image"]
-        ]
-        return batch
-
-    def apply_eval_transform(batch: dict[str, Any]) -> dict[str, Any]:
-        batch["pixel_values"] = [
-            eval_transform(ensure_rgb(image)) for image in batch["image"]
-        ]
-        return batch
-
     return (
-        train_dataset.with_transform(apply_train_transform),
-        val_dataset.with_transform(apply_eval_transform),
+        train_dataset.with_transform(
+            partial(apply_train_transform, transform=train_transform)
+        ),
+        val_dataset.with_transform(
+            partial(apply_eval_transform, transform=eval_transform)
+        ),
         class_names,
     )
 
@@ -447,12 +464,10 @@ def main() -> None:
     model = create_model(args.model, num_classes=len(class_names)).to(device)
     criterion = nn.CrossEntropyLoss()
 
-    # 从零训练 ResNet 时，SGD + momentum 是经典基线；lr 默认 0.1 对 batch_size=64
-    # 较激进，显存小或 batch 小时可降到 0.03 / 0.01。
-    optimizer = torch.optim.SGD(
+    # AdamW 对学习率更敏感，默认使用 3e-4，不沿用 SGD 常见的 0.1。
+    optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=args.lr,
-        momentum=args.momentum,
         weight_decay=args.weight_decay,
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
