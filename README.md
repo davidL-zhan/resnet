@@ -17,6 +17,7 @@ E:\miniconda\envs\DarkFLow\python.exe -m pip install -r requirements.txt
 - `torchvision`
 - `datasets`
 - `pillow`
+- `tqdm`
 
 ## 2. 检查数据集
 

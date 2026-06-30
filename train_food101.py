@@ -28,6 +28,7 @@ import torch.nn as nn
 from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from tqdm.auto import tqdm
 
 from resnet import resnet18, resnet34
 
@@ -95,12 +96,7 @@ def parse_args() -> argparse.Namespace:
         "--resume", type=Path, default=None, help="从某个 checkpoint 继续训练"
     )
     parser.add_argument(
-        "--print-freq", type=int, default=50, help="每多少个 step 打印一次训练状态"
-    )
-    parser.add_argument(
-        "--download-only",
-        action="store_true",
-        help="只加载数据集并打印 split 信息，不进入训练。",
+        "--print-freq", type=int, default=50, help="每多少个 step 刷新一次 tqdm 指标"
     )
 
     return parser.parse_args()
@@ -304,8 +300,16 @@ def train_one_epoch(
     total_loss = 0.0
     total_correct = 0
     total_samples = 0
+    update_freq = max(print_freq, 1)
 
-    for step, (images, labels) in enumerate(loader, start=1):
+    progress_bar = tqdm(
+        loader,
+        total=len(loader),
+        desc=f"epoch {epoch} train",
+        dynamic_ncols=True,
+    )
+
+    for step, (images, labels) in enumerate(progress_bar, start=1):
         images = images.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
 
@@ -325,12 +329,12 @@ def train_one_epoch(
         total_correct += (logits.argmax(dim=1) == labels).sum().item()
         total_samples += batch_size
 
-        if step % print_freq == 0 or step == len(loader):
+        if step % update_freq == 0 or step == len(loader):
             avg_loss = total_loss / total_samples
             avg_acc = total_correct / total_samples
-            print(
-                f"epoch={epoch} step={step}/{len(loader)} "
-                f"train_loss={avg_loss:.4f} train_top1={avg_acc:.4f}"
+            progress_bar.set_postfix(
+                train_loss=f"{avg_loss:.4f}",
+                train_top1=f"{avg_acc:.4f}",
             )
 
     return EpochResult(
@@ -447,10 +451,6 @@ def main() -> None:
     print(f"验证样本数: {len(val_dataset)}")
     print(f"类别数量: {len(class_names)}")
     print(f"前 10 个类别: {class_names[:10]}")
-
-    if args.download_only:
-        print("已完成数据集加载检查，--download-only 模式不进入训练。")
-        return
 
     device = torch.device(args.device)
     train_loader, val_loader = build_dataloaders(

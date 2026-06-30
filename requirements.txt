@@ -2,3 +2,4 @@ torch
 torchvision
 datasets
 pillow
+tqdm
