@@ -2,7 +2,7 @@
 使用 train_food101.py 保存的 checkpoint 对单张图片做 Food101 分类预测。
 
 示例：
-    python predict_food101.py --checkpoint checkpoints/food101_resnet18/best.pt --image demo.jpg
+    python predict_food101.py --checkpoint checkpoints\food101_resnet18\best.pt --image pic\food101_val_00819_hamburger.jpg
 
 checkpoint 中保存了：
 - model_name: resnet18、resnet34 或 resnet50
@@ -96,7 +96,7 @@ def main() -> None:
     for rank, (score, index) in enumerate(
         zip(scores.tolist(), indices.tolist()), start=1
     ):
-        print(f"top{rank}: {class_names[index]}  prob={score:.4f}")
+        print(f"top{rank}: index={index}  {class_names[index]}  prob={score:.4f}")
 
 
 if __name__ == "__main__":
