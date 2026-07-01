@@ -1,8 +1,8 @@
 """
-使用 train_food101.py 保存的 checkpoint 对单张图片做 Food101 分类预测。
+使用 train.py 保存的 checkpoint 对单张图片做 Food101 分类预测。
 
 示例：
-    python predict_food101.py --checkpoint checkpoints\food101_resnet18\best.pt --image pic\food101_val_00819_hamburger.jpg
+    python predict.py --checkpoint checkpoints\food101_resnet18\best.pt --image pic\food101_val_00819_hamburger.jpg
 
 checkpoint 中保存了：
 - model_name: resnet18、resnet34 或 resnet50
@@ -22,7 +22,7 @@ from PIL import Image
 from torchvision import transforms
 
 from resnet import resnet18, resnet34, resnet50
-from train_food101 import FOOD101_MEAN, FOOD101_STD
+from train import FOOD101_MEAN, FOOD101_STD
 
 
 def parse_args() -> argparse.Namespace:

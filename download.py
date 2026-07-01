@@ -4,7 +4,7 @@
 这个脚本负责训练前的数据准备检查：
 1. 通过 load_dataset("ethz/food101") 下载/读取 Food101。
 2. 打印 split 信息、类别数量、类别名示例和第一条训练样本。
-3. 统计 train split 自己的 RGB mean/std，输出可复制到 train_food101.py。
+3. 统计 train split 自己的 RGB mean/std，输出可复制到 train.py。
 
 注意：
 - 这个脚本不进入模型训练。
@@ -138,7 +138,7 @@ def print_stats_result(result: dict[str, object], output: Path | None) -> None:
     mean = tuple(round(value, 6) for value in result["mean"])
     std = tuple(round(value, 6) for value in result["std"])
 
-    print("\n可复制到 train_food101.py：")
+    print("\n可复制到 train.py：")
     print(f"FOOD101_MEAN = {mean}")
     print(f"FOOD101_STD = {std}")
 
