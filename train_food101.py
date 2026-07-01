@@ -250,10 +250,20 @@ def create_model(model_name: str, num_classes: int) -> nn.Module:
     """根据命令行参数创建本项目 resnet.py 里的模型。"""
 
     if model_name == "resnet18":
-        return resnet18(num_classes=num_classes)
-    if model_name == "resnet34":
-        return resnet34(num_classes=num_classes)
-    raise ValueError(f"Unsupported model: {model_name}")
+        model = resnet18(num_classes=num_classes)
+    elif model_name == "resnet34":
+        model = resnet34(num_classes=num_classes)
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
+
+    total_params = sum(param.numel() for param in model.parameters())
+    trainable_params = sum(param.numel() for param in model.parameters() if param.requires_grad)
+    print(
+        f"使用模型: {model_name} | "
+        f"总参数量: {total_params:,} | "
+        f"可训练参数量: {trainable_params:,}"
+    )
+    return model
 
 
 def accuracy_top1(logits: torch.Tensor, labels: torch.Tensor) -> float:
