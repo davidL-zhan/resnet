@@ -6,7 +6,7 @@ venv/
 
 checkpoints/
 runs/
-
+# pretrained/
 *.pt
 *.pth
 *.ckpt

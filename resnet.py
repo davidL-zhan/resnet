@@ -53,6 +53,65 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
+        y = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            y = self.downsample(x)
+
+        out = out + y
+        out = self.relu(out)
+
+        return out
+
+
+class Bottleneck(nn.Module):
+    """
+    ResNet-50 / ResNet-101 / ResNet-152 使用的瓶颈残差块
+
+    结构：
+        x -> Conv1x1 -> BN -> ReLU
+          -> Conv3x3 -> BN -> ReLU
+          -> Conv1x1 -> BN
+        shortcut(x) 加到主分支
+        -> ReLU
+
+    expansion=4 表示输出通道数是 out_channels 的 4 倍。
+    例如 stage1 的 out_channels=64，block 输出通道数就是 256。
+    """
+
+    expansion = 4
+
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+
+        self.conv1 = conv1x1(in_channels, out_channels, stride=1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+
+        self.conv2 = conv3x3(out_channels, out_channels, stride=stride)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        self.conv3 = conv1x1(out_channels, out_channels * self.expansion, stride=1)
+        self.bn3 = nn.BatchNorm2d(out_channels * self.expansion)
+
+        self.relu = nn.ReLU(inplace=True)
+
+        self.downsample = None
+
+        # Bottleneck 的输出通道是 out_channels * 4，shortcut 经常需要升维。
+        if stride != 1 or in_channels != out_channels * self.expansion:
+            self.downsample = nn.Sequential(
+                conv1x1(in_channels, out_channels * self.expansion, stride),
+                nn.BatchNorm2d(out_channels * self.expansion),
+            )
+
+    def forward(self, x):
         identity = x
 
         out = self.conv1(x)
@@ -61,6 +120,10 @@ class BasicBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
 
         if self.downsample is not None:
             identity = self.downsample(x)
@@ -80,9 +143,15 @@ class ResNet(nn.Module):
 
     ResNet-34:
         layers = [3, 4, 6, 3]
+
+    ResNet-50:
+        block = Bottleneck
+        layers = [3, 4, 6, 3]
+
+    默认 resnet18
     """
 
-    def __init__(self, block, layers, num_classes=1000, in_channels=3):
+    def __init__(self, block, layers=[2, 2, 2, 2], num_classes=1000, in_channels=3):
         super().__init__()
 
         self.in_channels = 64
@@ -90,20 +159,28 @@ class ResNet(nn.Module):
         # 输入一般是 [B, 3, 224, 224]
         self.conv1 = nn.Conv2d(
             in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
-        )
+        )  # [B, 64, 112, 112]
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-
-        self.layer1 = self._make_layer(block, 64, layers[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        # [B, 64, 56, 56]
+        self.layer1 = self._make_layer(
+            block, 64, layers[0], stride=1
+        )  # [B, 64, 56, 56]
+        self.layer2 = self._make_layer(
+            block, 128, layers[1], stride=2
+        )  # [B, 128, 28, 28]
+        self.layer3 = self._make_layer(
+            block, 256, layers[2], stride=2
+        )  # [B, 256, 14, 14]
+        self.layer4 = self._make_layer(
+            block, 512, layers[3], stride=2
+        )  # [B, 512, 7, 7]
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        # [B, 512, 1, 1]
+        self.fc = nn.Linear(512 * block.expansion, num_classes)  # [B, 1000]
 
         self._init_weights()
 
@@ -141,23 +218,23 @@ class ResNet(nn.Module):
                 nn.init.normal_(m.weight, mean=0, std=0.01)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x):  # x [B, 3, 224, 224]
         # stem
-        x = self.conv1(x)
+        x = self.conv1(x)  # [B, 64, 112, 112]
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+        x = self.maxpool(x)  # [B, 64, 56, 56]
 
         # residual stages
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.layer1(x)  # [B, 64, 56, 56]
+        x = self.layer2(x)  # [B, 128, 28, 28]
+        x = self.layer3(x)  # [B, 256, 14, 14]
+        x = self.layer4(x)  # [B, 512, 7, 7]
 
         # classifier
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        x = self.avgpool(x)  # [B, 512, 1, 1]
+        x = torch.flatten(x, 1)  #  [B, 512]
+        x = self.fc(x)  # [B, 1000]
 
         return x
 
@@ -180,12 +257,32 @@ def resnet34(num_classes=1000, in_channels=3):
     )
 
 
+def resnet50(num_classes=1000, in_channels=3):
+    return ResNet(
+        block=Bottleneck,
+        layers=[3, 4, 6, 3],
+        num_classes=num_classes,
+        in_channels=in_channels,
+    )
+
+
 if __name__ == "__main__":
-    model = resnet18(num_classes=101)
+    from torchinfo import summary
 
-    x = torch.randn(4, 3, 224, 224)
-    y = model(x)
+    model = resnet18(num_classes=10)
 
-    print(model)
+    x = torch.randn(2, 3, 224, 224)  # [B, 3, 224, 224]
+
+    # print(model)
     print("input shape:", x.shape)
+    summary(model, input_data=x)
+    with torch.no_grad():
+        y = model(x)
+    print("output :", y)
+    y = nn.functional.softmax(y, dim=1)
+
+    print("output :", y)
     print("output shape:", y.shape)
+    predictions = y.argmax(dim=1)
+    print("predictions shape:", predictions.shape)
+    print("predictions:", predictions)

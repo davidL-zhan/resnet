@@ -5,7 +5,7 @@
     python predict_food101.py --checkpoint checkpoints/food101_resnet18/best.pt --image demo.jpg
 
 checkpoint 中保存了：
-- model_name: resnet18 或 resnet34
+- model_name: resnet18、resnet34 或 resnet50
 - class_names: Food101 的 101 个类别名
 - model_state: 模型参数
 
@@ -21,8 +21,8 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from resnet import resnet18, resnet34
-from train_food101 import IMAGENET_MEAN, IMAGENET_STD, FOOD101_MEAN, FOOD101_STD
+from resnet import resnet18, resnet34, resnet50
+from train_food101 import FOOD101_MEAN, FOOD101_STD
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,6 +64,8 @@ def create_model(model_name: str, num_classes: int) -> torch.nn.Module:
         return resnet18(num_classes=num_classes)
     if model_name == "resnet34":
         return resnet34(num_classes=num_classes)
+    if model_name == "resnet50":
+        return resnet50(num_classes=num_classes)
     raise ValueError(f"Unsupported model in checkpoint: {model_name}")
 
 

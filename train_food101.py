@@ -4,11 +4,12 @@
 核心流程：
 1. load_dataset("ethz/food101") 下载/读取 Food101。
 2. 对 PIL 图片做训练增强或验证预处理。
-3. 调用 resnet.py 中的 resnet18 / resnet34，设置 num_classes=101。
+3. 调用 resnet.py 中的 resnet18 / resnet34 / resnet50，设置 num_classes=101。
 4. 用交叉熵训练多分类模型，并保存 last.pt 和 best.pt。
 
-Food101 是 101 类食物图片分类数据集。这里默认从零训练本项目的 ResNet，
-不是 torchvision 的 ImageNet 预训练模型。Reviewer #2 视角下需要注意：
+Food101 是 101 类食物图片分类数据集。这里默认从零训练本项目的 ResNet；
+传入 --pretrained 或 --pretrained-path 时，会加载 pretrained/ 下的本地
+ImageNet-1K 预训练权重。Reviewer #2 视角下需要注意：
 从零训练 ResNet-18 在 Food101 上收敛会明显慢于预训练微调，完整训练通常需要
 较多 epoch；如果只跑几个 epoch，验证准确率低是预期现象，不代表代码错误。
 """
@@ -30,7 +31,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm.auto import tqdm
 
-from resnet import resnet18, resnet34
+from resnet import resnet18, resnet34, resnet50
 import warnings
 
 warnings.filterwarnings("ignore", message="Truncated File Read")
@@ -40,6 +41,12 @@ FOOD101_STD = (0.259, 0.263, 0.265)
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
+
+DEFAULT_PRETRAINED_WEIGHTS = {
+    "resnet18": Path("pretrained/resnet18-f37072fd.pth"),
+    "resnet34": Path("pretrained/resnet34-b627a593.pth"),
+    "resnet50": Path("pretrained/resnet50-11ad3fa6.pth"),
+}
 
 
 @dataclass
@@ -58,7 +65,20 @@ def parse_args() -> argparse.Namespace:
         "--image-size", type=int, default=224, help="输入图片裁剪后的边长"
     )
     # 模型和优化参数。
-    parser.add_argument("--model", choices=["resnet18", "resnet34"], default="resnet18")
+    parser.add_argument(
+        "--model", choices=["resnet18", "resnet34", "resnet50"], default="resnet18"
+    )
+    parser.add_argument(
+        "--pretrained",
+        action="store_true",
+        help="从 pretrained/ 加载 ImageNet-1K 预训练权重，跳过最后的 fc 分类层。",
+    )
+    parser.add_argument(
+        "--pretrained-path",
+        type=Path,
+        default=None,
+        help="手动指定本地预训练权重路径；不传则按 --model 自动选择。",
+    )
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--num-workers", type=int, default=8)
@@ -103,7 +123,10 @@ def set_seed(seed: int) -> None:
     torch.backends.cudnn.benchmark = True
 
 
-def build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Compose]:
+def build_transforms(
+    image_size: int,
+    use_imagenet_norm: bool,
+) -> tuple[transforms.Compose, transforms.Compose]:
     """
     构造训练和验证预处理。
 
@@ -111,13 +134,18 @@ def build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Co
     验证阶段使用确定性的 resize + center crop，保证指标稳定。
     """
 
+    mean = IMAGENET_MEAN if use_imagenet_norm else FOOD101_MEAN
+    std = IMAGENET_STD if use_imagenet_norm else FOOD101_STD
+    norm_name = "ImageNet" if use_imagenet_norm else "Food101"
+    print(f"输入归一化: {norm_name} mean/std")
+
     train_transform = transforms.Compose(
         [
             transforms.Resize(image_size + 32),
             transforms.RandomResizedCrop(image_size, scale=(0.6, 1.0)),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.ToTensor(),
-            transforms.Normalize(FOOD101_MEAN, FOOD101_STD),
+            transforms.Normalize(mean, std),
         ]
     )
 
@@ -126,7 +154,7 @@ def build_transforms(image_size: int) -> tuple[transforms.Compose, transforms.Co
             transforms.Resize(image_size + 32),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
-            transforms.Normalize(FOOD101_MEAN, FOOD101_STD),
+            transforms.Normalize(mean, std),
         ]
     )
 
@@ -178,7 +206,10 @@ def load_food101(args: argparse.Namespace):
     train_dataset = raw_dataset["train"]
     val_dataset = raw_dataset["validation"]
 
-    train_transform, eval_transform = build_transforms(args.image_size)
+    train_transform, eval_transform = build_transforms(
+        image_size=args.image_size,
+        use_imagenet_norm=args.pretrained,
+    )
 
     return (
         train_dataset.with_transform(
@@ -253,6 +284,8 @@ def create_model(model_name: str, num_classes: int) -> nn.Module:
         model = resnet18(num_classes=num_classes)
     elif model_name == "resnet34":
         model = resnet34(num_classes=num_classes)
+    elif model_name == "resnet50":
+        model = resnet50(num_classes=num_classes)
     else:
         raise ValueError(f"Unsupported model: {model_name}")
 
@@ -264,6 +297,82 @@ def create_model(model_name: str, num_classes: int) -> nn.Module:
         f"可训练参数量: {trainable_params:,}"
     )
     return model
+
+
+def resolve_pretrained_path(model_name: str, pretrained_path: Path | None) -> Path:
+    """根据模型名解析本地 ImageNet 预训练权重路径。"""
+
+    if pretrained_path is not None:
+        return pretrained_path
+
+    if model_name not in DEFAULT_PRETRAINED_WEIGHTS:
+        raise ValueError(f"当前模型没有默认预训练权重路径: {model_name}")
+
+    return DEFAULT_PRETRAINED_WEIGHTS[model_name]
+
+
+def load_imagenet_pretrained(
+    model: nn.Module,
+    model_name: str,
+    pretrained_path: Path | None,
+) -> None:
+    """
+    给本项目手写 ResNet 加载本地 ImageNet-1K 预训练权重。
+
+    这里先用 resnet.py 构建 Food101 的 101 类模型，再加载本地 .pth。
+    ImageNet 是 1000 类，Food101 是 101 类，因此 fc.weight / fc.bias
+    形状不匹配，会被自动跳过并保留当前随机初始化的 Food101 分类头。
+    """
+
+    weight_path = resolve_pretrained_path(model_name, pretrained_path)
+    if not weight_path.is_file():
+        raise FileNotFoundError(
+            f"找不到预训练权重: {weight_path}。请先把权重下载到 pretrained/，"
+            "或用 --pretrained-path 指定正确路径。"
+        )
+
+    checkpoint = torch.load(weight_path, map_location="cpu")
+    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+        pretrained_state = checkpoint["state_dict"]
+    else:
+        pretrained_state = checkpoint
+
+    model_state = model.state_dict()
+    compatible_state = {}
+    skipped_keys = []
+    unexpected_keys = []
+
+    for key, value in pretrained_state.items():
+        clean_key = key.removeprefix("module.")
+
+        if clean_key not in model_state:
+            unexpected_keys.append(clean_key)
+            continue
+
+        if model_state[clean_key].shape != value.shape:
+            skipped_keys.append(
+                f"{clean_key}: pretrained={tuple(value.shape)}, model={tuple(model_state[clean_key].shape)}"
+            )
+            continue
+
+        compatible_state[clean_key] = value
+
+    missing_keys, load_unexpected_keys = model.load_state_dict(
+        compatible_state, strict=False
+    )
+
+    print(f"已加载 ImageNet 预训练权重: {weight_path}")
+    print(f"成功加载参数数量: {len(compatible_state)}")
+    if skipped_keys:
+        print("因形状不匹配跳过的参数:")
+        for item in skipped_keys:
+            print(f"  - {item}")
+    if unexpected_keys or load_unexpected_keys:
+        print(f"权重文件中未使用的参数数量: {len(unexpected_keys) + len(load_unexpected_keys)}")
+    if missing_keys:
+        print("模型中未从预训练权重加载的参数:")
+        for key in missing_keys:
+            print(f"  - {key}")
 
 
 def accuracy_top1(logits: torch.Tensor, labels: torch.Tensor) -> float:
@@ -434,6 +543,9 @@ def load_checkpoint_if_needed(
 
 def main() -> None:
     args = parse_args()
+    if args.pretrained_path is not None:
+        args.pretrained = True
+
     set_seed(args.seed)
 
     train_dataset, val_dataset, class_names = load_food101(args)
@@ -452,7 +564,14 @@ def main() -> None:
         device=device,
     )
 
-    model = create_model(args.model, num_classes=len(class_names)).to(device)
+    model = create_model(args.model, num_classes=len(class_names))
+    if args.pretrained:
+        load_imagenet_pretrained(
+            model=model,
+            model_name=args.model,
+            pretrained_path=args.pretrained_path,
+        )
+    model = model.to(device)
     criterion = nn.CrossEntropyLoss()
 
     # AdamW 对学习率更敏感，默认使用 3e-4，不沿用 SGD 常见的 0.1。
