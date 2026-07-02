@@ -24,7 +24,9 @@ from torchvision import transforms
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="下载并检查 ethz/food101 数据集")
-    parser.add_argument("--image-size", type=int, default=224, help="CenterCrop 后的输入边长")
+    parser.add_argument(
+        "--image-size", type=int, default=224, help="CenterCrop 后的输入边长"
+    )
     parser.add_argument(
         "--resize-margin",
         type=int,
@@ -157,8 +159,8 @@ def main() -> None:
     dataset = load_dataset("ethz/food101")
     print_dataset_summary(dataset)
 
-    result = compute_mean_std(dataset["train"], args)
-    print_stats_result(result, args.output)
+    # result = compute_mean_std(dataset["train"], args)
+    # print_stats_result(result, args.output)
 
 
 if __name__ == "__main__":

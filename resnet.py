@@ -32,7 +32,7 @@ class BasicBlock(nn.Module):
 
     expansion = 1
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels=3, out_channels=64, stride=1):
         super().__init__()
 
         self.conv1 = conv3x3(in_channels, out_channels, stride)
@@ -53,22 +53,22 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
-        y = x
+        identity = x
 
-        out = self.conv1(x)
+        out = self.conv1(x)  # [B, 64, 56, 56]
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.relu(out)  # [B, 64, 56, 56]
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        out = self.bn2(out)  # [B, 64, 56, 56]
 
         if self.downsample is not None:
-            y = self.downsample(x)
+            identity = self.downsample(x)
 
-        out = out + y
-        out = self.relu(out)
+        out = out + identity  # [B, 64, 56, 56]
+        out = self.relu(out)  # [B, 64, 56, 56]
 
-        return out
+        return out  #   [B, 64, 56, 56]
 
 
 class Bottleneck(nn.Module):
@@ -165,6 +165,7 @@ class ResNet(nn.Module):
 
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         # [B, 64, 56, 56]
+
         self.layer1 = self._make_layer(
             block, 64, layers[0], stride=1
         )  # [B, 64, 56, 56]
@@ -269,13 +270,13 @@ def resnet50(num_classes=1000, in_channels=3):
 if __name__ == "__main__":
     from torchinfo import summary
 
-    model = resnet18(num_classes=10)
+    model = resnet34(num_classes=5)
 
     x = torch.randn(2, 3, 224, 224)  # [B, 3, 224, 224]
 
     # print(model)
     print("input shape:", x.shape)
-    summary(model, input_data=x)
+    # summary(model, input_data=x)
     with torch.no_grad():
         y = model(x)
     print("output :", y)

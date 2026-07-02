@@ -80,7 +80,7 @@ def parse_args() -> argparse.Namespace:
         help="手动指定本地预训练权重路径；不传则按 --model 自动选择。",
     )
     parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)

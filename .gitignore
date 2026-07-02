@@ -3,7 +3,7 @@ __pycache__/
 .vscode/
 .venv/
 venv/
-
+.idea/
 checkpoints/
 runs/
 # pretrained/
