@@ -149,6 +149,8 @@ def print_stats_result(result: dict[str, object], output: Path | None) -> None:
         with output.open("w", encoding="utf-8") as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
         print(f"\n已保存统计结果: {output}")
+    
+    
 
 
 def main() -> None:

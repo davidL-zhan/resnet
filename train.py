@@ -32,6 +32,7 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 
 from resnet import resnet18, resnet34, resnet50
+from VIT import vit_base_patch16_224
 import warnings
 
 warnings.filterwarnings("ignore", message="Truncated File Read")
@@ -290,7 +291,9 @@ def create_model(model_name: str, num_classes: int) -> nn.Module:
         raise ValueError(f"Unsupported model: {model_name}")
 
     total_params = sum(param.numel() for param in model.parameters())
-    trainable_params = sum(param.numel() for param in model.parameters() if param.requires_grad)
+    trainable_params = sum(
+        param.numel() for param in model.parameters() if param.requires_grad
+    )
     print(
         f"使用模型: {model_name} | "
         f"总参数量: {total_params:,} | "
@@ -368,7 +371,9 @@ def load_imagenet_pretrained(
         for item in skipped_keys:
             print(f"  - {item}")
     if unexpected_keys or load_unexpected_keys:
-        print(f"权重文件中未使用的参数数量: {len(unexpected_keys) + len(load_unexpected_keys)}")
+        print(
+            f"权重文件中未使用的参数数量: {len(unexpected_keys) + len(load_unexpected_keys)}"
+        )
     if missing_keys:
         print("模型中未从预训练权重加载的参数:")
         for key in missing_keys:
@@ -564,7 +569,8 @@ def main() -> None:
         device=device,
     )
 
-    model = create_model(args.model, num_classes=len(class_names))
+    # model = create_model(args.model, num_classes=len(class_names))
+    model = vit_base_patch16_224(101, 3)
     if args.pretrained:
         load_imagenet_pretrained(
             model=model,
