@@ -560,7 +560,7 @@ def main() -> None:
     print(f"类别数量: {len(class_names)}")
     print(f"前 10 个类别: {class_names[:10]}")
 
-    device = torch.device(args.device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     train_loader, val_loader = build_dataloaders(
         train_dataset=train_dataset,
         val_dataset=val_dataset,

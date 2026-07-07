@@ -493,7 +493,7 @@ if __name__ == "__main__":
     # 输出 y: [B, num_classes] = [2, 101]
     model = vit_tiny(num_classes=101)
     x = torch.randn(2, 3, 224, 224)
-
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     with torch.no_grad():
         y = model(x)
 
