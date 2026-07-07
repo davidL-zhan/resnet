@@ -488,14 +488,17 @@ def vit_base(num_classes: int = 1000, in_channels: int = 3) -> VisionTransformer
 
 
 if __name__ == "__main__":
+    from torchinfo import summary
+
     # 简单前向测试：
     # 输入 x: [B, C, H, W] = [2, 3, 224, 224]
     # 输出 y: [B, num_classes] = [2, 101]
-    model = vit_tiny(num_classes=101)
+    model = vit_base(num_classes=101)
     x = torch.randn(2, 3, 224, 224)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    with torch.no_grad():
-        y = model(x)
+    summary(model, input_data=x, device=device)
+    # with torch.no_grad():
+    #     y = model(x)
 
     total_params = sum(param.numel() for param in model.parameters())
     print("input shape:", x.shape)

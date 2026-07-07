@@ -1,5 +1,15 @@
-torch
-torchvision
-datasets
-pillow
+# PyTorch CUDA 12.8 wheels are hosted on the official PyTorch index.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.8.0+cu128
+datasets==5.0.0
+sentencepiece
 tqdm
+torchinfo
+transformers
+fastapi
+starlette
+uvicorn
+openai
+streamlit
+requests
