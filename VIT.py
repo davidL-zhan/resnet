@@ -11,7 +11,7 @@ class ViTForImageClassification(torch.nn.Module):
 
     def forward(self, x):
         self.vit.eval()
-        with torch.inference_mode():
+        with torch.no_grad():
             outputs = self.vit(x)
         cls_token = outputs.last_hidden_state[:, 0, :]
         return self.classifier(cls_token)
