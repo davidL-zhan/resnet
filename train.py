@@ -86,7 +86,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--weight-decay", type=float, default=3e-5)
     parser.add_argument(
         "--amp",
         action="store_true",
