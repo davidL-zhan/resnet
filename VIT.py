@@ -10,7 +10,9 @@ class ViTForImageClassification(torch.nn.Module):
         self.classifier = torch.nn.Linear(self.hidden_size, num_classes)
 
     def forward(self, x):
-        outputs = self.vit(x)
+        self.vit.eval()
+        with torch.inference_mode():
+            outputs = self.vit(x)
         cls_token = outputs.last_hidden_state[:, 0, :]
         return self.classifier(cls_token)
 
