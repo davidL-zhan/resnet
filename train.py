@@ -32,7 +32,9 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 
 from resnet import resnet18, resnet34, resnet50
-from VIT import vit_base_patch16_224
+
+# from VIT_learn import vit_base
+from ViT import ViTForImageClassification
 import warnings
 
 warnings.filterwarnings("ignore", message="Truncated File Read")
@@ -570,7 +572,7 @@ def main() -> None:
     )
 
     # model = create_model(args.model, num_classes=len(class_names))
-    model = vit_base_patch16_224(101, 3)
+    model = ViTForImageClassification(num_classes=len(class_names))
     if args.pretrained:
         load_imagenet_pretrained(
             model=model,

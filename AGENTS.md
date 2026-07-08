@@ -1,0 +1,1 @@
+在该项目中使用resnet的conda环境
